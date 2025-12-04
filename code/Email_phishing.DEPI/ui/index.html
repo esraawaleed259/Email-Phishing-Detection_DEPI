@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Phishing Analysis Interface</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Arial', 'sans-serif'],
+                    },
+                    colors: {
+                        // ألوان جديدة: أسود، أزرق، نيلي
+                        'primary-dark': '#0A0A1A', // أسود عميق للخلفية
+                        'secondary-dark': '#1C1C30', // لون لوحات التحكم
+                        'data-light': '#E0FBFC', // نص فاتح
+                        'accent-indigo': '#4F46E5', // النيلي (للعناوين والأزرار الرئيسية)
+                        'accent-blue': '#3B82F6', // الأزرق الفاتح
+                        'danger': '#EF4444', 
+                        'warning': '#FCD34D', 
+                        'success': '#10B981', 
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0A0A1A; /* Primary Dark (الأسود العميق) */
+            color: #E0FBFC; /* Data Light */
+            direction: ltr; 
+            text-align: left;
+        }
+
+        .dashboard-container {
+            background-color: #1C1C30; /* Secondary Dark (لوحات التحكم) */
+            border: 1px solid #4F46E533; /* border-accent-indigo/30 */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px #4F46E511 inset;
+        }
+
+        #analyzeButton {
+            background: linear-gradient(90deg, #4F46E5, #3B82F6); /* تدرج نيلي إلى أزرق */
+            color: #E0FBFC;
+            font-weight: 700;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+        }
+        #analyzeButton:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(79, 70, 229, 0.6);
+        }
+        #analyzeButton:disabled {
+            background: #4B5563;
+            color: #9CA3AF;
+            box-shadow: none;
+        }
+
+        .risk-gauge-container {
+            position: relative;
+            height: 180px;
+            width: 100px;
+            margin: 0 auto;
+            border-radius: 50% / 10px; 
+            border: 4px solid #4B5563;
+            background: #0A0A1A; /* Primary Dark */
+            box-shadow: 0 0 10px #4F46E533;
+            overflow: hidden;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .risk-gauge-fill {
+            width: 100%;
+            height: var(--fill-height, 0%);
+            background-color: var(--fill-color, #4B5563); 
+            transition: height 2s cubic-bezier(0.2, 0.5, 0.4, 1.0), background-color 0.5s;
+            border-radius: 0 0 50% / 10px;
+        }
+
+        #gaugeScoreText {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5rem;
+            font-weight: 900;
+            text-shadow: 0 0 5px #0A0A1A, 0 0 10px #4F46E5; /* Primary Dark shadow */
+            z-index: 10;
+        }
+        
+        .utility-icon {
+            color: #4F46E5; /* Accent Indigo */
+            background-color: #0A0A1A; /* Primary Dark */
+            border: 2px solid #4F46E5;
+            transition: all 0.2s;
+        }
+        .utility-icon:hover:not(:disabled) {
+            background-color: #4F46E5;
+            color: #0A0A1A;
+        }
+        .utility-icon:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #4B5563;
+        }
+
+        .modal-content {
+            background-color: #0A0A1A; /* Primary Dark */
+            border: 2px solid #4F46E5;
+            box-shadow: 0 0 30px rgba(79, 70, 229, 0.5);
+        }
+
+        .flag-item {
+            border-left: 4px solid var(--border-color); 
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 min-h-screen flex justify-center items-start">
+
+    <!-- Main Application Container -->
+    <div class="w-full max-w-5xl dashboard-container rounded-3xl p-6 sm:p-10 transition-all duration-300">
+        
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-accent-indigo mb-2 text-center border-b-2 border-accent-indigo/50 pb-3">
+            Phishing Detector Interface
+        </h1>
+        <p class="text-data-light/70 text-center mb-10 text-lg">
+            Upload an email file (.eml) for core risk analysis.
+        </p>
+
+        <!-- Main Interaction Area: Upload and Gauge -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-center mb-12 p-6 bg-secondary-dark/50 rounded-2xl border border-accent-indigo/30 shadow-xl">
+            
+            <!-- Left Column (LTR): Risk Gauge -->
+            <div class="col-span-1 text-center order-1">
+                <p class="text-xl font-bold text-data-light mb-4">Risk Gauge</p>
+                <div class="risk-gauge-container">
+                    <div id="riskGaugeFill" class="risk-gauge-fill"></div>
+                    <span id="gaugeScoreText">0%</span>
+                </div>
+            </div>
+
+            <!-- Right and Middle Columns (LTR): File Upload and Actions -->
+            <div class="col-span-1 md:col-span-2 space-y-6 order-2">
+                
+                <!-- File Upload Area -->
+                <div class="rounded-xl p-6 text-center border-2 border-dashed border-accent-indigo/70 bg-secondary-dark/70 hover:bg-secondary-dark transition duration-300">
+                    <input type="file" id="emlFile" accept=".eml, .txt, .msg" class="hidden" onchange="displayFileName(this)">
+                    <label for="emlFile" class="cursor-pointer inline-flex items-center justify-center px-8 py-3 text-lg rounded-full shadow-lg"
+                           title="Select the .eml file to analyze"
+                           style="border: 2px solid #4F46E5; color: #E0FBFC;">
+                        <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Select Email File (.eml)
+                    </label>
+                    <p id="fileNameDisplay" class="mt-4 text-data-light/50 truncate">No file selected.</p>
+                </div>
+                
+                <!-- Analysis Button -->
+                <button id="analyzeButton" onclick="analyzeFile()"
+                    class="w-full px-8 py-3 text-xl rounded-full transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
+                    disabled>
+                    <span id="buttonText">Start Analysis</span>
+                    <svg id="loadingSpinner" class="animate-spin ml-3 h-6 w-6 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+
+                <!-- Progress Bar -->
+                <div id="progressBarContainer" class="w-full bg-secondary-dark rounded-full h-3 hidden">
+                    <div id="progressBarFill" class="h-3 rounded-full transition-all duration-300" style="width: 0%; background-color: #4F46E5;"></div>
+                </div>
+
+                <!-- Utility Icons -->
+                <div class="flex justify-center gap-6 mt-4">
+                    
+                    <!-- JSON Download Button -->
+                    <button onclick="downloadReportJson()" id="downloadJsonButton" disabled
+                        class="p-3 rounded-full utility-icon" title="Download Analysis Report (JSON)">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    </button>
+
+                    <!-- Original Text Button -->
+                    <button onclick="showOriginalText()" id="originalTextButton" disabled
+                        class="p-3 rounded-full utility-icon" title="View Original Email Text">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </button>
+
+                    <!-- Tips Button -->
+                    <button onclick="showTipsModal()"
+                        class="p-3 rounded-full utility-icon" title="Security Tips and Guidelines">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error or Alert Message -->
+        <div id="messageBox" class="p-4 rounded-xl hidden border-l-8" role="alert" style="direction: ltr;">
+            <p id="messageText" class="font-medium"></p>
+        </div>
+
+        <!-- Report Display Area -->
+        <div id="reportContainer" class="mt-10 pt-6 border-t border-accent-indigo/30 hidden">
+            <h2 class="text-3xl font-bold text-accent-indigo mb-8 text-center">Analysis Results</h2>
+
+            <!-- Summary Card -->
+            <div id="summaryCard" class="p-6 rounded-2xl shadow-2xl mb-8 transition-all duration-300 border-l-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                    <div>
+                        <p class="text-sm font-medium text-data-light/60">Overall Score</p>
+                        <p id="reportScore" class="text-5xl font-extrabold mt-1 text-data-light"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-data-light/60">Verdict</p>
+                        <p id="reportVerdict" class="text-2xl font-bold mt-2 text-data-light"></p>
+                    </div>
+                    <div class="text-left">
+                        <p class="text-sm font-medium text-data-light/60">From</p>
+                        <p id="reportFrom" class="text-lg font-medium text-data-light mt-2 truncate" style="direction: ltr;"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Info -->
+            <div class="space-y-4">
+                <div class="bg-secondary-dark/70 p-4 rounded-lg">
+                    <p class="font-semibold text-data-light">Subject:</p>
+                    <p id="reportSubject" class="text-data-light/80 mt-1"></p>
+                </div>
+                <div class="bg-secondary-dark/70 p-4 rounded-lg">
+                    <p class="font-semibold text-data-light">To:</p>
+                    <p id="reportTo" class="text-data-light/80 mt-1 truncate" style="direction: ltr;"></p>
+                </div>
+            </div>
+            
+            <!-- Risk Breakdown Section -->
+            <div class="mt-8">
+                <h3 class="text-2xl font-bold text-accent-indigo mb-4">Risk Factor Breakdown</h3>
+                <ul id="riskBreakdownContainer" class="space-y-3">
+                    <!-- Breakdown items will be injected here -->
+                </ul>
+                <div id="noBreakdownMessage" class="hidden text-data-light/50 italic mt-4">
+                    No significant factors contributed to the risk score.
+                </div>
+            </div>
+
+            <!-- Flags/Details Section -->
+            <div class="mt-8">
+                <h3 class="text-2xl font-bold text-accent-indigo mb-4">Detailed Flags and Warnings</h3>
+                <ul id="reportFlags" class="space-y-3">
+                    <!-- Flags will be injected here -->
+                </ul>
+                <div id="noFlagsMessage" class="hidden text-data-light/50 italic mt-4">
+                    No specific warning flags were found.
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- --- Modal for Original Text --- -->
+    <div id="originalTextModal" class="fixed inset-0 bg-primary-dark/90 z-50 hidden justify-center items-center p-4" onclick="this.classList.add('hidden')">
+        <div class="modal-content rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <h3 class="text-2xl font-bold text-accent-indigo mb-4 border-b border-accent-indigo/50 pb-2">Original Email Text</h3>
+            <pre id="originalTextContent" class="whitespace-pre-wrap text-sm text-data-light/80 bg-primary-dark p-4 rounded-lg border border-accent-indigo/50" style="direction: ltr; text-align: left;"></pre>
+            <button onclick="document.getElementById('originalTextModal').classList.add('hidden')" class="mt-4 px-4 py-2 bg-accent-indigo text-primary-dark rounded-full hover:bg-accent-indigo/80 transition font-bold">Close</button>
+        </div>
+    </div>
+
+    <!-- --- Modal for Tips --- -->
+    <div id="tipsModal" class="fixed inset-0 bg-primary-dark/90 z-50 hidden justify-center items-center p-4" onclick="this.classList.add('hidden')">
+        <div class="modal-content rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <h3 class="text-2xl font-bold text-success mb-4 border-b border-success/50 pb-2">Anti-Phishing Security Tips</h3>
+            <ul class="list-disc list-inside space-y-4 text-data-light/80">
+                <li><span class="font-bold text-success">Verify the Sender:</span> Always check the full email address of the sender, not just the display name. Look for subtle spelling errors in the domain name.</li>
+                <li><span class="font-bold text-success">Don't Click Links:</span> Never click on links or open attachments from unexpected or suspicious emails. Hover your mouse over links to see the real destination in the status bar.</li>
+                <li><span class="font-bold text-success">Sense of Urgency:</span> Phishing messages often create a false sense of urgency ("Your account will be suspended now!") to rush you into making a mistake.</li>
+                <li><span class="font-bold text-success">Personal Information:</span> Never enter your password, credit card number, or personal details in response to an email.</li>
+            </ul>
+            <button onclick="document.getElementById('tipsModal').classList.add('hidden')" class="mt-6 px-4 py-2 bg-success text-primary-dark rounded-full hover:bg-success/80 transition font-bold">Got It</button>
+        </div>
+    </div>
+
+
+    <script>
+        // *** API Configuration ***
+        // Note: The API path remains /analyze, which is the standard endpoint for the service.
+        const API_URL = 'http://127.0.0.1:8000/analyze';
+        
+        // UI Elements
+        const fileInput = document.getElementById('emlFile');
+        const analyzeButton = document.getElementById('analyzeButton');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const reportContainer = document.getElementById('reportContainer');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const buttonText = document.getElementById('buttonText');
+        const riskGaugeFill = document.getElementById('riskGaugeFill');
+        const gaugeScoreText = document.getElementById('gaugeScoreText');
+        const originalTextButton = document.getElementById('originalTextButton');
+        const downloadJsonButton = document.getElementById('downloadJsonButton'); 
+        const summaryCard = document.getElementById('summaryCard');
+        const progressBarContainer = document.getElementById('progressBarContainer');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const riskBreakdownContainer = document.getElementById('riskBreakdownContainer');
+        
+        let lastReport = null; 
+        let progressInterval = null;
+
+        // Function to display the selected file name
+        function displayFileName(input) {
+            if (input.files.length > 0) {
+                fileNameDisplay.textContent = `Selected File: ${input.files[0].name}`;
+                analyzeButton.disabled = false;
+            } else {
+                fileNameDisplay.textContent = 'No file selected.';
+                analyzeButton.disabled = true;
+            }
+        }
+
+        // Function to show messages
+        function showMessage(text, type = 'info') {
+            // Remove 'flex' and set it only if not 'hidden'
+            if (messageBox.classList.contains('hidden')) {
+                 messageBox.classList.remove('flex'); // Remove flex before showing
+            }
+            messageBox.classList.remove('hidden', 'bg-danger/20', 'bg-success/20', 'bg-warning/20', 'bg-accent-indigo/20', 'border-danger', 'border-success', 'border-warning', 'border-accent-indigo');
+            messageText.textContent = text;
+            
+            let bgColor, borderColor, textColor;
+            if (type === 'error') {
+                bgColor = 'bg-danger/20'; borderColor = 'border-danger'; textColor = 'text-danger';
+            } else if (type === 'success') {
+                bgColor = 'bg-success/20'; borderColor = 'border-success'; textColor = 'text-success';
+            } else if (type === 'warning') { 
+                bgColor = 'bg-warning/20'; borderColor = 'border-warning'; textColor = 'text-warning';
+            } else { // info
+                bgColor = 'bg-accent-indigo/20'; borderColor = 'border-accent-indigo'; textColor = 'text-accent-indigo';
+            }
+            
+            messageBox.classList.add(bgColor, borderColor, 'border-data-light');
+            messageText.classList.remove('text-data-light', 'text-danger', 'text-warning', 'text-success', 'text-accent-indigo');
+            messageText.classList.add(textColor);
+            messageBox.classList.remove('hidden');
+            messageBox.classList.add('flex'); // Add flex back when showing
+        }
+
+        // Manages the visual progress bar fill
+        function startProgressBar() {
+            progressBarContainer.classList.remove('hidden');
+            progressBarFill.style.width = '0%';
+            let progress = 0;
+            const step = 5; 
+            const intervalTime = 150; 
+
+            progressInterval = setInterval(() => {
+                if (progress < 90) {
+                    progress += step;
+                    progressBarFill.style.width = `${progress}%`;
+                }
+            }, intervalTime);
+        }
+
+        function finishProgressBar(isError = false) {
+            clearInterval(progressInterval);
+            progressBarFill.style.width = '100%';
+            if (isError) {
+                progressBarFill.style.backgroundColor = '#EF4444'; // Danger color
+            } else {
+                 progressBarFill.style.backgroundColor = '#10B981'; // Success color
+            }
+            setTimeout(() => {
+                 progressBarContainer.classList.add('hidden');
+                 progressBarFill.style.backgroundColor = '#4F46E5'; // Reset color to accent
+            }, 1000); 
+        }
+
+        // Function to analyze the file
+        async function analyzeFile() {
+            const file = fileInput.files[0];
+            if (!file) {
+                showMessage('Please select a file first.', 'error');
+                return;
+            }
+
+            // Set loading state
+            reportContainer.classList.add('hidden');
+            messageBox.classList.add('hidden');
+            originalTextButton.disabled = true;
+            downloadJsonButton.disabled = true; 
+            analyzeButton.disabled = true;
+            loadingSpinner.classList.remove('hidden');
+            buttonText.textContent = 'Analyzing...';
+            updateRiskGauge(0, true); 
+            startProgressBar(); 
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const rawContent = await file.text(); 
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: `Analysis failed with status ${response.status}.` }));
+                    throw new Error(errorData.detail || `Analysis failed. Status code: ${response.status}`);
+                }
+
+                const report = await response.json();
+                
+                report.original_text = report.original_text || rawContent; 
+                
+                lastReport = report; 
+                displayReport(report);
+                finishProgressBar(false);
+                showMessage('Analysis completed successfully.', 'success'); 
+
+            } catch (error) {
+                console.error("Analysis Error:", error);
+                
+                const rawContent = await file.text().catch(() => ''); 
+                // Fallback to local simulation 
+                const simulatedReport = simulateAnalysis(rawContent, file.name);
+                lastReport = simulatedReport;
+                displayReport(simulatedReport);
+                finishProgressBar(true);
+                showMessage(`API error (${error.message}). Displaying local simulation estimate.`, 'warning');
+            } finally {
+                // Stop loading state
+                loadingSpinner.classList.add('hidden');
+                buttonText.textContent = 'Start Analysis';
+                analyzeButton.disabled = false;
+            }
+        }
+        
+        // Local analysis simulation (matching core logic for score boundaries)
+        function simulateAnalysis(text, filename) {
+            const lowerText = text.toLowerCase();
+            const breakdown = [];
+            let score = 5; 
+            
+            // Factor 1: High Risk Keywords (Base points: 30)
+            if (lowerText.includes('password') || lowerText.includes('account suspended') || lowerText.includes('login portal')) {
+                const points = 30;
+                score += points;
+                breakdown.push({ factor: "High-Risk Keywords (Simulated)", points: points, text: "Directly asks for credentials or warns of suspension." });
+            }
+            
+            // Factor 2: Urgency/Pressure Language (Base points: 20)
+            if (lowerText.includes('urgent') || lowerText.includes('immediate') || lowerText.includes('action required')) {
+                const points = 20;
+                score += points;
+                breakdown.push({ factor: "High Urgency/Pressure (Simulated)", points: points, text: "The message creates pressure for immediate action." });
+            }
+            
+            // Factor 3: Link/File Clues (Base points: 25)
+            if (text.match(/https?:\/\/[0-9]{1,3}\.[0-9]{1,3}/ig)) {
+                 const points = 25;
+                 score += points;
+                 breakdown.push({ factor: "IP-based URL Detected (Simulated)", points: 25, text: "Contains a URL using a direct IP address." });
+            } else if (text.match(/https?:\/\/[a-z0-9\-\.]+\.[a-z]{2,}/ig)) {
+                 const points = 10;
+                 score += points;
+                 breakdown.push({ factor: "External Links Detected (Simulated)", points: 10, text: "Contains external links requiring verification." });
+            }
+            
+            // Factor 4: Financial/Suspicious File Clues (Base points: 15)
+            if (lowerText.includes('invoice') || lowerText.includes('payment') || filename.includes('.zip')) {
+                 const points = 15;
+                 score += points;
+                 breakdown.push({ factor: "Financial/Suspicious File Clues (Simulated)", points: 15, text: "Contains financial terms or common archive file names." });
+            }
+            
+            score = Math.min(100, score); 
+            
+            let verdict = 'LIKELY SAFE (LOW RISK)';
+            // Use core thresholds: 75 for PHISH, 45 for SUSPICIOUS
+            if (score >= 75) verdict = 'PHISHING (HIGH RISK)';
+            else if (score >= 45) verdict = 'SUSPICIOUS (MEDIUM RISK)';
+            
+            // Generate simple flags list from breakdown texts
+            const flags = breakdown.map(b => b.factor + ': ' + b.text);
+
+            return {
+                score: score,
+                verdict: verdict,
+                flags: flags, 
+                breakdown: breakdown, 
+                subject: "SIMULATED: " + filename.replace('.eml', '').substring(0, 40) + '...',
+                from: 'simulated@core.com',
+                to: 'user@local.host',
+                original_text: text 
+            };
+        }
+
+        // Function to update the Risk Gauge
+        function updateRiskGauge(score, reset = false) {
+            score = Math.min(100, Math.max(0, score || 0));
+            const fillHeight = `${score}%`;
+            let fillColor = '';
+            
+            // Match core thresholds: 75, 45
+            if (score < 20) {
+                fillColor = 'var(--success)'; 
+            } else if (score < 45) {
+                fillColor = 'var(--accent-blue)'; // changed from cyan
+            } else if (score < 75) {
+                fillColor = 'var(--warning)'; 
+            } else { 
+                fillColor = 'var(--danger)'; 
+            }
+
+            if (reset) {
+                riskGaugeFill.style.transition = 'none';
+                riskGaugeFill.style.setProperty('--fill-height', '0%');
+                riskGaugeFill.style.backgroundColor = '#4B5563'; 
+                gaugeScoreText.textContent = `0%`;
+                setTimeout(() => {
+                    riskGaugeFill.style.transition = 'height 2s cubic-bezier(0.2, 0.5, 0.4, 1.0), background-color 0.5s';
+                }, 50);
+
+            } else {
+                riskGaugeFill.style.setProperty('--fill-height', fillHeight);
+                riskGaugeFill.style.backgroundColor = fillColor;
+                gaugeScoreText.textContent = `${score}%`;
+            }
+        }
+
+        // Function to display the report in the UI
+        function displayReport(report) {
+            const score = report.score !== undefined ? report.score : 0;
+            updateRiskGauge(score); 
+            
+            const verdictText = report.verdict || 'Unknown';
+            let bgColor, scoreColor, borderColor;
+
+            // Match core thresholds: 75, 45
+            if (verdictText.toUpperCase().includes('PHISHING') || score >= 75) {
+                bgColor = 'bg-danger/20';
+                scoreColor = 'text-danger';
+                borderColor = 'border-danger';
+            } else if (verdictText.toUpperCase().includes('SUSPICIOUS') || score >= 45) {
+                bgColor = 'bg-warning/20';
+                scoreColor = 'text-warning';
+                borderColor = 'border-warning';
+            } else if (verdictText.toUpperCase().includes('SAFE') || score < 45) {
+                bgColor = 'bg-success/20';
+                scoreColor = 'text-success';
+                borderColor = 'border-success';
+            } else {
+                bgColor = 'bg-secondary-dark/70';
+                scoreColor = 'text-data-light/70';
+                borderColor = 'border-accent-indigo';
+            }
+
+            summaryCard.className = `p-6 rounded-2xl shadow-2xl mb-8 transition-all duration-300 border-l-8 ${borderColor} ${bgColor}`;
+
+            document.getElementById('reportScore').textContent = score;
+            document.getElementById('reportScore').className = `text-5xl font-extrabold mt-1 ${scoreColor}`;
+            document.getElementById('reportVerdict').textContent = verdictText;
+            document.getElementById('reportVerdict').className = `text-2xl font-bold mt-2 ${scoreColor}`;
+            document.getElementById('reportFrom').textContent = report.from || 'N/A';
+            document.getElementById('reportSubject').textContent = report.subject || 'N/A';
+            document.getElementById('reportTo').textContent = report.to || 'N/A';
+            
+            originalTextButton.disabled = !(report.original_text && report.original_text.trim().length > 0);
+            downloadJsonButton.disabled = !report; 
+
+            // 1. FILL DETAILED BREAKDOWN
+            const breakdown = report.breakdown || [];
+            riskBreakdownContainer.innerHTML = '';
+            
+            if (breakdown.length > 0) {
+                document.getElementById('noBreakdownMessage').classList.add('hidden');
+                breakdown.forEach(item => {
+                    const li = document.createElement('li');
+                    const points = item.points || 0;
+                    const barWidth = Math.min(100, points * 3) + '%'; 
+                    
+                    let barColor = '#10B981'; 
+                    if (points >= 5) barColor = '#FCD34D'; 
+                    if (points >= 10) barColor = '#EF4444'; 
+
+                    li.className = 'bg-secondary-dark/70 p-3 rounded-lg border border-accent-indigo/50 shadow-sm';
+                    li.innerHTML = `
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-medium text-data-light">${item.factor}</span>
+                            <span class="font-bold text-lg" style="color: ${scoreColor}">${points} pts</span>
+                        </div>
+                        <div class="w-full bg-primary-dark rounded-full h-2">
+                            <div class="h-2 rounded-full transition-all duration-700" style="width: ${barWidth}; background-color: ${barColor};"></div>
+                        </div>
+                        <p class="text-sm text-data-light/60 mt-2">${item.text}</p>
+                    `;
+                    riskBreakdownContainer.appendChild(li);
+                });
+            } else {
+                document.getElementById('noBreakdownMessage').classList.remove('hidden');
+            }
+            
+            // 2. FILL SIMPLE FLAGS LIST
+            const flagsList = document.getElementById('reportFlags');
+            flagsList.innerHTML = ''; 
+            const flags = report.flags || [];
+
+            if (flags.length > 0) {
+                document.getElementById('noFlagsMessage').classList.add('hidden');
+                flags.forEach(flag => {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-start bg-secondary-dark/70 p-3 rounded-lg border-l-4 border-danger flag-item';
+                    li.style.setProperty('--border-color', '#EF4444');
+                    li.innerHTML = `
+                        <svg class="flex-shrink-0 w-6 h-6 text-danger mr-3 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        <span class="text-data-light/80 font-medium">${flag}</span>
+                    `;
+                    flagsList.appendChild(li);
+                });
+            } else {
+                document.getElementById('noFlagsMessage').classList.remove('hidden');
+            }
+
+            reportContainer.classList.remove('hidden');
+        }
+        
+        // Function to download the report as a JSON file
+        function downloadReportJson() {
+            if (!lastReport) {
+                showMessage('Please run an analysis first.', 'info');
+                return;
+            }
+
+            try {
+                const reportToDownload = { ...lastReport };
+                delete reportToDownload.original_text; 
+                
+                const json = JSON.stringify(reportToDownload, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                
+                const a = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                
+                const subject = lastReport.subject || 'analysis_report';
+                const safeSubject = subject.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 30);
+                const filename = `${safeSubject}_${new Date().toISOString().slice(0, 10)}.json`; 
+
+                a.href = url;
+                a.download = filename;
+                
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showMessage('JSON report download started.', 'info');
+                
+            } catch (e) {
+                console.error('Download Error:', e);
+                showMessage('Failed to create or download JSON report.', 'error');
+            }
+        }
+        
+        // Function to show the original email text
+        function showOriginalText() {
+            const modal = document.getElementById('originalTextModal');
+            const content = document.getElementById('originalTextContent');
+            
+            if (lastReport && lastReport.original_text) {
+                content.textContent = lastReport.original_text;
+            } else {
+                content.textContent = 'Sorry, the original email text was not found in the report.';
+            }
+            // Use classList.add('flex') when removing 'hidden'
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+        
+        // Function to show the tips modal
+        function showTipsModal() {
+            const modal = document.getElementById('tipsModal');
+            // Use classList.add('flex') when removing 'hidden'
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+        
+        // Initialize risk gauge on load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateRiskGauge(0);
+        });
+    </script>
+</body>
+</html>

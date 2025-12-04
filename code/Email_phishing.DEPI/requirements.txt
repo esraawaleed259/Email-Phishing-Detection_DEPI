@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+requests
+pydantic
+python-multipart
+tldextract
+beautifulsoup4
+lxml
